@@ -35,8 +35,8 @@ if __name__ == "__main__":
     key = generate_key()
 
     # Открытые данные
-    a = 10
-    b = 20
+    a = int(input('Введите а: '))
+    b = int(input('Введите б: '))
 
     # Шифрование
     c_a = encrypt(a, key)
