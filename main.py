@@ -1,55 +1,48 @@
-def generate_key(modulus=256):
-    """
-    Генерация простого ключа (в реальном FHE используется сложная математика).
-    Здесь ключ — это случайное число, используемое для шифрования.
-    """
-    import random
-    key = random.randint(1, modulus - 1)
-    return key
+import tenseal as ts
+import numpy as np
 
+# 1. Настройка параметров FHE
+def setup_fhe():
+    # Создаём контекст FHE (схема CKKS)
+    context = ts.context(ts.SCHEME_TYPE.CKKS, poly_modulus_degree=8192, coeff_mod_bit_sizes=[60, 40, 40, 60])
+    context.global_scale = 2**40  # Масштаб для дробных чисел
+    context.generate_galois_keys()  # Ключи для умножения и поворотов
+    return context
 
-def encrypt(plaintext, key, modulus=256):
-    """
-    Шифрование: добавляем ключ к открытому тексту по модулю.
-    """
-    return (plaintext + key) % modulus
+# 2. Определение простой нейросети
+class SimpleEncryptedNN:
+    def __init__(self, context):
+        self.context = context
+        # Веса модели (обученные заранее)
+        self.weights1 = np.random.randn(2, 3)  # Входной слой -> скрытый
+        self.bias1 = np.random.randn(3)
+        self.weights2 = np.random.randn(3, 1)  # Скрытый -> выходной
+        self.bias2 = np.random.randn(1)
 
+    def forward(self, x_enc):
+        # Первый слой: линейная комбинация + ReLU
+        x_enc = x_enc.mm(self.weights1) + self.bias1
+        x_enc = x_enc.polyval([0, 1])  # Аппроксимация ReLU (линейная функция)
 
-def decrypt(ciphertext, key, modulus=256):
-    """
-    Расшифровка: вычитаем ключ из шифротекста по модулю.
-    """
-    return (ciphertext - key) % modulus
+        # Второй слой: линейная комбинация
+        x_enc = x_enc.mm(self.weights2) + self.bias2
+        return x_enc
 
-
-def homomorphic_add(c1, c2, modulus=256):
-    """
-    Гомоморфное сложение двух зашифрованных чисел.
-    """
-    return (c1 + c2) % modulus
-
-
-# Пример использования
+# 3. Пример использования
 if __name__ == "__main__":
-    # Генерация ключа
-    key = generate_key()
+    # Настройка FHE
+    context = setup_fhe()
 
-    # Открытые данные
-    a = int(input('Введите а: '))
-    b = int(input('Введите б: '))
+    # Создание нейросети
+    model = SimpleEncryptedNN(context)
 
-    # Шифрование
-    c_a = encrypt(a, key)
-    c_b = encrypt(b, key)
+    # Входные данные (зашифрованные)
+    input_data = np.array([1.5, -0.5])
+    input_enc = ts.ckks_vector(context, input_data)
 
-    print(f"Зашифрованное a: {c_a}")
-    print(f"Зашифрованное b: {c_b}")
-
-    # Гомоморфное сложение
-    c_sum = homomorphic_add(c_a, c_b)
-    print(f"Зашифрованная сумма: {c_sum}")
+    # Предсказание на зашифрованных данных
+    output_enc = model.forward(input_enc)
 
     # Расшифровка результата
-    result = decrypt(c_sum, key)
-    print(f"Результат расшифровки: {result}")
-    print(f"Ожидаемый результат (a + b): {a + b}")
+    output = output_enc.decrypt()[0]
+    print("Результат предсказания (расшифрованный):", output)
