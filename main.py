@@ -46,3 +46,10 @@ if __name__ == "__main__":
     # Расшифровка результата
     output = output_enc.decrypt()[0]
     print("Результат предсказания (расшифрованный):", output)
+
+    # Проверка: то же самое, но без шифрования
+x = np.array([1.5, -0.5])
+y = np.dot(x, model.weights1) + model.bias1
+y = y  # тут ReLU-затычка = f(x) = x
+z = np.dot(y, model.weights2) + model.bias2
+print("Открытый результат:", z[0])
